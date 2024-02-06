@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 const tempMovieData = [
   {
     imdbID: "tt1375666",
@@ -45,28 +45,92 @@ const tempWatchedData = [
     userRating: 9,
   },
 ];
-export default function App() {
-  const [movies, setMovies] = useState(tempMovieData);
 
+export default function App() {
+  const [query, setQuery] = useState("");
+  const [selectedId, setSelectedId] = useState(null);
+  const [movies, setMovies] = useState();
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState("");
+  // useEffect(function () {
+  //   console.log('a')
+  // },[query])
+  function handleSelectedMovie(id) {
+    setSelectedId(id);
+  }
+  function handleCloseMovie() {
+    setSelectedId(null)
+  }
+  useEffect(
+    function () {
+      async function fetchMovies() {
+        try {
+          setIsLoading(true);
+          setError("");
+          const res = await fetch(
+            `http://www.omdbapi.com/?i=tt3896198&apikey=fd61d4f6&s=${query}`
+          );
+          if (!res.ok) throw new Error("something went wrong");
+          const data = await res.json();
+          setMovies(data.Search);
+          if (data.Response === "False") throw new Error("movie not found");
+        } catch (err) {
+          setError(err.message);
+        } finally {
+          setIsLoading(false);
+        }
+      }
+      if (query.length < 3) {
+        setMovies([]);
+        setError("");
+        return;
+      }
+      fetchMovies();
+    },
+    [query]
+  );
+
+  function Loader() {
+    return <div className="loader">Loading ... </div>;
+  }
+  function ErrorMessage({ message }) {
+    return <p className="error">{message}</p>;
+  }
   return (
     <>
-      <NavBar>
+      <NavBar setQuery={setQuery} query={query}>
         <NumResults movies={movies} />
       </NavBar>
-      <Main>
-        <ListBox element={<MovieList movies={movies} />} />
+      <Main
+        WatchedBox={
+          selectedId ? <MovieDetails onCloseMovie={handleCloseMovie} selectedId={selectedId} /> : <WatchedBox />
+        }
+      >
+        {isLoading && <Loader />}
+        {!isLoading && !error && (
+          <ListBox
+            element={
+              <MovieList onSelectMovie={handleSelectedMovie} movies={movies} />
+            }
+          />
+        )}
+        {error && <ErrorMessage message={error} />}
       </Main>
     </>
   );
 }
-function NavBar({ element }) {
+function NavBar({ element, query, setQuery }) {
   return (
     <nav className="nav-bar">
       <Logo />
-      <Search />
+      <Search setQuery={setQuery} query={query} />
       {element}
     </nav>
   );
+}
+function MovieDetails({ selectedId ,onCloseMovie}) {
+  return <div className="details">{selectedId}
+  <button className="btn-back" onClick={onCloseMovie}>D</button></div>;
 }
 function Logo() {
   return (
@@ -83,9 +147,7 @@ function NumResults({ movies }) {
     </p>
   );
 }
-function Search() {
-  const [query, setQuery] = useState("");
-
+function Search({ query, setQuery }) {
   return (
     <input
       className="search"
@@ -96,11 +158,11 @@ function Search() {
     />
   );
 }
-function Main({ children }) {
+function Main({ children, WatchedBox }) {
   return (
     <main className="main">
       {children}
-      <WatchedBox />
+      {WatchedBox}
     </main>
   );
 }
@@ -118,7 +180,7 @@ function ListBox({ element }) {
       >
         {isOpen1 ? "–" : "+"}
       </button>
-      {isOpen1 &&  element }
+      {isOpen1 && element}
     </div>
   );
 }
@@ -144,18 +206,18 @@ function WatchedBox() {
   );
 }
 
-function MovieList({ movies }) {
+function MovieList({ movies, onSelectMovie }) {
   return (
-    <ul className="list">
+    <ul className="list list-movies">
       {movies?.map((movie) => (
-        <Movie movie={movie} />
+        <Movie key={movie.id} movie={movie} onSelectMovie={onSelectMovie} />
       ))}
     </ul>
   );
 }
-function Movie({ movie }) {
+function Movie({ movie, onSelectMovie }) {
   return (
-    <li key={movie.imdbID}>
+    <li onClick={()=>onSelectMovie(movie.imdbID)} key={movie.imdbID}>
       <img src={movie.Poster} alt={`${movie.Title} poster`} />
       <h3>{movie.Title}</h3>
       <div>
